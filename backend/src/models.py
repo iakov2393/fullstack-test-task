@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, func
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -26,6 +26,7 @@ class StoredFile(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+        index=True,  # every listing query orders by this column
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -34,16 +35,30 @@ class StoredFile(Base):
         nullable=False,
     )
 
+    alerts: Mapped[list["Alert"]] = relationship(
+        back_populates="file",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
 
 class Alert(Base):
     __tablename__ = "alerts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    file_id: Mapped[str] = mapped_column(String(36), ForeignKey("files.id"), nullable=False)
+    file_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("files.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,  # Postgres does NOT auto-index FK columns
+    )
     level: Mapped[str] = mapped_column(String(50), nullable=False)
     message: Mapped[str] = mapped_column(String(500), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+        index=True,  # every listing query orders by this column
     )
+
+    file: Mapped["StoredFile"] = relationship(back_populates="alerts")
